@@ -9,7 +9,7 @@
 ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   
 ```
 
-**Modular bug bounty recon + vulnerability pipeline**
+**Modular bug bounty recon + vulnerability pipeline — with an autonomous intelligence layer**
 
 </div>
 
@@ -21,9 +21,18 @@
 
 ## Overview
 
-`bbhunt` is a single-file, fully modular bash pipeline that chains together the best open-source recon and vuln-scanning tools into one clean workflow. Every phase is optional, skippable, and composable. Results are automatically triaged — critical and high findings land in a dedicated `findings/` directory so you never have to dig through raw output.
+BBHUNT is two layers that work together:
+
+| Layer | What it is | Answers |
+|---|---|---|
+| **`bbhunt.sh`** | A single-file, fully modular bash pipeline chaining the best open-source recon and vuln-scanning tools into one clean workflow. Every phase is optional, skippable, and composable. Critical and high findings land in a dedicated `findings/` directory so you never have to dig through raw output. | *What is on this target?* |
+| **`skill/`** | A persistent Claude Code skill — autonomous bug-bounty intelligence and vulnerability research. Triggered by the single word `BBHUNT`. | *Where is the highest-value legitimate opportunity right now, why is it worth researching, and how do I prove it safely?* |
+
+Use the intelligence layer to decide **what deserves your time**, then point the pipeline at it.
 
 ---
+
+# Layer 1 — The pipeline (`bbhunt.sh`)
 
 ## Features
 
@@ -81,6 +90,8 @@ Every run creates a timestamped directory:
         └── js-secrets.txt
 ```
 
+`hunts/` is git-ignored — hunt output is never committed.
+
 ---
 
 ## Installation
@@ -88,10 +99,10 @@ Every run creates a timestamped directory:
 ### 1. Clone
 
 ```bash
-git clone https://github.com/yourusername/bbhunt.git
-cd bbhunt
-chmod +x bbhunt
-sudo mv bbhunt /usr/local/bin/
+git clone https://github.com/ShuPriX/BBHUNT.git
+cd BBHUNT
+chmod +x bbhunt.sh
+sudo cp bbhunt.sh /usr/local/bin/bbhunt
 ```
 
 ### 2. Install dependencies
@@ -281,6 +292,179 @@ The script skips any phase gracefully if a tool is missing — you'll see a `[!]
 - **Only care about OSINT?** `--phases osint` runs phase 7 only — no active scanning.
 - **JS secrets finding false positives?** Check `js-secrets.txt` manually; the grep is intentionally broad.
 - The `latest` symlink always points to your most recent run — use it in scripts: `cat ~/hunts/example.com/latest/findings/critical.txt`
+
+---
+
+# Layer 2 — The intelligence skill (`skill/`)
+
+## Quick start
+
+```bash
+./skill/install.sh     # install the skill so the trigger word works anywhere
+./tools/harden.sh      # enable secret-scanning hooks + verify repo security
+./tools/bbenv.sh --set # store your Anthropic key OUTSIDE the repo (mode 600)
+
+# then, in Claude Code:
+BBHUNT
+```
+
+That single word runs the full workflow: read state → refresh stale sources → discover and verify programs → rank → pull new high-impact disclosures → correlate with scope → filter → pick the top 1-3 → analyze the patch → reproduce locally → write the artifacts → update state → report.
+
+| Command | Does |
+|---|---|
+| `BBHUNT` | full daily run |
+| `BBHUNT <program\|domain>` | skip discovery, hunt that program |
+| `BBHUNT CVE-2026-1234` | research one vulnerability for bounty eligibility |
+| `BBHUNT programs` | rank programs only |
+| `BBHUNT report` | regenerate today's report from state |
+
+---
+
+## Principles
+
+**Quality over quantity.** One deeply researched opportunity beats forty listed CVEs. A run that honestly reports `NO HIGH-CONFIDENCE HIGH-IMPACT OPPORTUNITY FOUND TODAY` is a correct run.
+
+**Never fabricate.** Missing reward data is `REWARD_UNKNOWN`. Thin evidence is `INSUFFICIENT DATA`. There is no "80% payout chance" — the 80-point threshold is a ranking tier on a composite score, not a probability.
+
+**Scope first, lab first.** Nothing is tested until the asset is verified in-scope against the current official policy. Everything is reproduced locally before a live asset is touched, and then only with the minimum non-destructive proof the policy permits.
+
+**State, not repetition.** Processed CVEs, rejected programs, and unchanged scope are never re-analyzed. That is what makes a daily run cheap.
+
+---
+
+## Layout
+
+```
+bbhunt.sh                  recon + vuln pipeline (authorization-gated)
+config/
+  platforms.yaml           where to look — platforms, program indexes, vuln feeds
+  scoring.yaml             both scoring models; single source of truth for weights
+  exclusions.yaml          always-rejected classes, chain requirements, hard stops
+skill/
+  SKILL.md                 the compact core — loaded every run
+  modules/                 loaded on demand, one per target type or phase
+  templates/               artifact + report skeletons
+  state/                   repository-backed memory (current/programs/vulns/history)
+  install.sh               installs the skill into ~/.claude/skills
+tools/
+  bbstate.py               state: seen / record / reject / queue / validate / stats
+  bbscore.py               reproducible scoring from config/scoring.yaml
+  bbreport.py              scaffold daily/weekly reports and research dirs
+  bbenv.sh                 load the API key from outside the repo
+  secret-scan.sh           the one gate: staged / tree / history
+  harden.sh                apply and audit the repo security controls
+.githooks/                 pre-commit + pre-push secret scanning
+.gitleaks.toml             custom rules (Anthropic keys, H1/Bugcrowd, recon keys)
+SECURITY.md                key handling, disclosure policy, CI posture
+intelligence/              verified program intel, platform digests, rankings
+opportunities/             daily candidate lists and the running top list
+research/<year>/<program>/<vuln-id>/
+                           README.md report.md poc.md changes.diff nuclei.yaml metadata.json
+reports/daily/ reports/weekly/
+.github/workflows/         daily intel + weekly summary
+```
+
+### Modules
+
+Loaded one at a time — never all twelve.
+
+| Module | Loaded when |
+|---|---|
+| `programs` | discovering and verifying programs, scope, rewards |
+| `vulnerability-intel` | source catalog, correlation chain, freshness, duplicates |
+| `scoring` | both score models, confidence bands |
+| `patch-analysis` | any candidate with public source or a fix commit |
+| `poc` | building the local lab and the reproduction |
+| `reporting` | artifacts, daily and weekly reports |
+| `wordpress` `web` `api` `cloud` `mobile` `ai` | one per candidate, by target type |
+
+---
+
+## Tools
+
+```bash
+python3 tools/bbstate.py status                    # start every run here
+python3 tools/bbstate.py seen vuln CVE-2026-1234   # NEW, or SEEN:<status> (exit 1)
+python3 tools/bbstate.py reject CVE-2026-9999 --reason "excluded class"
+python3 tools/bbstate.py stale --days 7            # programs due for re-verification
+python3 tools/bbstate.py validate research/2026/acme/CVE-2026-1234
+python3 tools/bbstate.py stats
+
+python3 tools/bbscore.py weights
+python3 tools/bbscore.py opportunity --impact 27 --payout 16 --acceptance 11 \
+        --exploitability 13 --scope 8 --freshness 4 --dupres 4
+python3 tools/bbscore.py confidence --score 72 --items 4
+
+python3 tools/bbreport.py daily
+python3 tools/bbreport.py new acme CVE-2026-1234   # artifact dir from templates
+```
+
+Sub-scores are entered out of each component's own weight cap; the tool rejects out-of-range input so a score is always reproducible from `config/scoring.yaml`.
+
+---
+
+## Scoring
+
+**PROGRAM OPPORTUNITY SCORE** /100 — reward potential 25 · acceptance evidence 20 · scope quality 15 · attack surface 15 · activity 10 · duplicate resistance 10 · feasibility 5.
+
+**OPPORTUNITY SCORE** /100 — technical impact 30 · payout potential 20 · acceptance evidence 15 · exploitability 15 · scope quality 10 · freshness 5 · duplicate resistance 5.
+
+CVSS is not an input and is not a tie-breaker. A 9.8 in a deployment nobody runs loses to a 6.5 that reaches real user data.
+
+---
+
+## Automation
+
+`.github/workflows/daily-intel.yml` runs the deterministic half daily — state check, source reachability, scope-delta digests from the public bulk dump, scaffolded report. The analysis half runs **Claude Opus 5 at `xhigh` effort**, and only when `ANTHROPIC_API_KEY` is set as a repository secret; without it the workflow still produces the deltas a local `BBHUNT` run consumes.
+
+`.github/workflows/weekly-summary.yml` aggregates the week on Mondays.
+
+Set the CI key (reads stdin — never hits disk or shell history):
+
+```bash
+gh secret set ANTHROPIC_API_KEY --repo ShuPriX/BBHUNT
+```
+
+---
+
+## Security
+
+This repository is **public**. Two things must never reach a commit: credentials, and undisclosed vulnerability details. Full policy in [`SECURITY.md`](SECURITY.md).
+
+| Control | Where |
+|---|---|
+| Key storage | `~/.config/bbhunt/env` (mode 600, outside the repo) or a GitHub Actions secret — never a tracked file |
+| Pre-commit / pre-push hooks | gitleaks with BBHUNT rules; blocks the commit |
+| Custom gitleaks rules | the default pack does **not** detect Anthropic keys — `.gitleaks.toml` adds them, plus H1/Bugcrowd/recon-service keys |
+| Disclosure guard | blocks committing `research/` artifacts without `"public_disclosure_ok": true` |
+| CI posture | schedule/manual triggers only, SHA-pinned actions, `contents: read` by default, `persist-credentials: false`, key scoped to one masked step |
+| GitHub | secret scanning + push protection enabled |
+
+```bash
+tools/harden.sh --audit        # status only
+tools/secret-scan.sh history   # audit all past commits
+tools/bbenv.sh --check         # masked key status
+```
+
+Before creating the API key: put it in a **dedicated Anthropic workspace with a monthly spend limit**, and use separate keys for CI and local. A leaked key with a cap is an annoyance; one without is not.
+
+---
+
+## Safety
+
+Active testing is restricted to explicitly authorized bug-bounty/VDP scope and the program's own rules. BBHUNT will not perform denial of service, destructive testing, data exfiltration, credential theft, persistence, evasion, or mass exploitation, and will not build tooling for them. Proof-of-concept code targets a local lab, not an arbitrary host.
+
+`bbhunt.sh` keeps its own interactive authorization gate — you type the target domain to confirm before it runs. That gate is not bypassed on your behalf.
+
+If authorization cannot be established: `RESEARCH-ONLY / NO ACTIVE TESTING`.
+
+---
+
+## Requirements
+
+**Intelligence layer:** Python 3.9+ with `pyyaml`, plus `git`, `curl`, `jq`. `gitleaks` and `gh` recommended. Docker or Podman for local reproduction.
+
+**Pipeline:** see [Tool Dependencies](#tool-dependencies) above — every tool is optional and skipped gracefully.
 
 ---
 

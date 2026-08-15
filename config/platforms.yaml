@@ -1,0 +1,146 @@
+# BBHUNT platform & source catalog
+#
+# This is a catalog of where to LOOK, not a claim that anything listed is
+# currently active. Every candidate program is re-verified against its own
+# official policy page before research (skill/modules/programs.md §2).
+#
+# refresh_days = how stale this source may get before S2 re-fetches it.
+# The list is deliberately extensible — add reputable sources as you find them.
+
+meta:
+  seed_catalog: https://github.com/disclose/bug-bounty-platforms
+  bulk_scope_dump: https://github.com/arkadiyt/bounty-targets-data
+  updated: "2026-08-16"
+
+platforms:
+  - id: hackerone
+    name: HackerOne
+    programs_index: https://hackerone.com/opportunities/all
+    directory: https://hackerone.com/directory/programs
+    public_reports: https://hackerone.com/hacktivity
+    bulk_data: https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/hackerone_data.json
+    acceptance_evidence: [hacktivity disclosed reports, program stats block, thanks page]
+    refresh_days: 1
+    tier: 2
+
+  - id: bugcrowd
+    name: Bugcrowd
+    programs_index: https://bugcrowd.com/engagements
+    public_reports: https://bugcrowd.com/crowdstream
+    bulk_data: https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/bugcrowd_data.json
+    acceptance_evidence: [crowdstream, VRT tier mapping, program reward range]
+    refresh_days: 1
+    tier: 2
+
+  - id: intigriti
+    name: Intigriti
+    programs_index: https://app.intigriti.com/researcher/programs
+    bulk_data: https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/intigriti_data.json
+    refresh_days: 2
+    tier: 2
+
+  - id: yeswehack
+    name: YesWeHack
+    programs_index: https://yeswehack.com/programs
+    bulk_data: https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/yeswehack_data.json
+    refresh_days: 2
+    tier: 2
+
+  - id: immunefi
+    name: Immunefi
+    programs_index: https://immunefi.com/bug-bounty/
+    notes: web3/DeFi; highest published maximums; TVL-gated triage
+    refresh_days: 3
+    tier: 2
+
+  - id: huntr
+    name: huntr (open source / AI-ML)
+    programs_index: https://huntr.com/bounties
+    notes: OSS and ML library vulns; CVE assignment; low-friction submission
+    refresh_days: 3
+    tier: 2
+
+  - id: patchstack
+    name: Patchstack MVDP
+    programs_index: https://patchstack.com/database/
+    submit: https://patchstack.com/alliance/
+    notes: WordPress plugin/theme; published reward tiers
+    refresh_days: 1
+    tier: 2
+
+  - id: wordfence
+    name: Wordfence Bug Bounty
+    programs_index: https://www.wordfence.com/threat-intel/vulnerabilities/
+    notes: WordPress; published tiers; corroborates Patchstack
+    refresh_days: 1
+    tier: 2
+
+  - id: bugbase
+    name: Bugbase
+    programs_index: https://bugbase.ai/programs
+    refresh_days: 7
+    tier: 2
+
+  - id: hackenproof
+    name: HackenProof
+    programs_index: https://hackenproof.com/programs
+    bulk_data: https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/hackenproof_data.json
+    refresh_days: 7
+    tier: 2
+
+  - id: cobalt
+    name: Cobalt
+    programs_index: https://cobalt.io/vulnerability-disclosure-programs
+    refresh_days: 14
+    tier: 2
+
+  - id: github_security_lab
+    name: GitHub Security Lab
+    programs_index: https://securitylab.github.com/bounties/
+    notes: OSS; CodeQL-query bounties too
+    refresh_days: 7
+    tier: 2
+
+  - id: vendor_vdp
+    name: Vendor VDPs (direct)
+    programs_index: https://disclose.io/programs/
+    notes: security.txt at /.well-known/security.txt is the per-target check
+    refresh_days: 7
+    tier: 1
+
+vulnerability_sources:
+  general:
+    - {id: cve,        url: "https://cveawg.mitre.org/api/cve/",                         tier: 1, refresh_days: 1}
+    - {id: nvd,        url: "https://services.nvd.nist.gov/rest/json/cves/2.0",          tier: 2, refresh_days: 1}
+    - {id: kev,        url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog", tier: 2, refresh_days: 1}
+    - {id: ghsa,       url: "https://github.com/advisories",                             tier: 2, refresh_days: 1}
+    - {id: osv,        url: "https://api.osv.dev/v1/query",                              tier: 2, refresh_days: 1}
+    - {id: snyk,       url: "https://security.snyk.io/vuln",                             tier: 2, refresh_days: 3}
+    - {id: gitlab_adv, url: "https://advisories.gitlab.com/",                            tier: 2, refresh_days: 3}
+    - {id: exploitdb,  url: "https://www.exploit-db.com/",                               tier: 3, refresh_days: 3}
+    - {id: packetstorm,url: "https://packetstorm.news/",                                 tier: 3, refresh_days: 7}
+  wordpress:
+    - {id: patchstack_db, url: "https://patchstack.com/database/",                       tier: 2, refresh_days: 1}
+    - {id: wordfence_intel, url: "https://www.wordfence.com/threat-intel/vulnerabilities/", tier: 2, refresh_days: 1}
+    - {id: wpscan,     url: "https://wpscan.com/plugins/",                               tier: 2, refresh_days: 3}
+    - {id: wp_svn,     url: "https://plugins.svn.wordpress.org/",                        tier: 1, refresh_days: 0}
+  ecosystems:
+    npm:    {advisories: "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm", tier: 2}
+    pypi:   {advisories: "https://osv.dev/list?ecosystem=PyPI", tier: 2}
+    maven:  {advisories: "https://osv.dev/list?ecosystem=Maven", tier: 2}
+    nuget:  {advisories: "https://github.com/advisories?query=ecosystem%3Anuget", tier: 2}
+    rubygems: {advisories: "https://rubysec.com/", tier: 2}
+    go:     {advisories: "https://pkg.go.dev/vuln/", tier: 1}
+    rust:   {advisories: "https://rustsec.org/advisories/", tier: 1}
+    docker: {advisories: "https://docs.docker.com/security/", tier: 1}
+    k8s:    {advisories: "https://kubernetes.io/docs/reference/issues-security/official-cve-feed/", tier: 1}
+  cloud:
+    - {id: aws,   url: "https://aws.amazon.com/security/security-bulletins/",            tier: 1, refresh_days: 3}
+    - {id: gcp,   url: "https://cloud.google.com/support/bulletins",                     tier: 1, refresh_days: 3}
+    - {id: azure, url: "https://msrc.microsoft.com/update-guide/",                       tier: 1, refresh_days: 3}
+  cicd:
+    - {id: gha,     url: "https://github.com/advisories?query=actions",                  tier: 2, refresh_days: 7}
+    - {id: jenkins, url: "https://www.jenkins.io/security/advisories/",                  tier: 1, refresh_days: 7}
+
+# Sources that failed on the last run are recorded in skill/state/current.json
+# under "failed_sources" — never substitute a guess for a source that failed.

@@ -1,0 +1,72 @@
+# BBHUNT secret-scanning rules.
+#
+# Extends the gitleaks default rule pack with the credential types this repo
+# actually handles. Verified: the default pack alone does NOT catch Anthropic
+# API keys, which is the specific key this pipeline uses.
+#
+# Used by: .githooks/pre-commit, .githooks/pre-push, tools/secret-scan.sh,
+# and the secret-scan job in .github/workflows/.
+
+title = "BBHUNT"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-[A-Za-z0-9_\-]{16,}'''
+keywords = ["sk-ant"]
+
+[[rules]]
+id = "anthropic-admin-key"
+description = "Anthropic admin key"
+regex = '''sk-ant-admin[A-Za-z0-9_\-]{16,}'''
+keywords = ["sk-ant-admin"]
+
+[[rules]]
+id = "anthropic-key-assignment"
+description = "ANTHROPIC_API_KEY assigned a literal value"
+regex = '''(?i)ANTHROPIC_API_KEY\s*[:=]\s*["']?[A-Za-z0-9_\-]{16,}'''
+keywords = ["anthropic_api_key"]
+
+[[rules]]
+id = "bbhunt-generic-secret-assignment"
+description = "Generic credential assigned a literal value"
+regex = '''(?i)\b(api[_-]?key|apikey|auth[_-]?token|access[_-]?token|secret[_-]?key|client[_-]?secret|session[_-]?cookie)\b\s*[:=]\s*["'][A-Za-z0-9/+_\-]{20,}["']'''
+keywords = ["api_key", "apikey", "auth_token", "access_token", "secret_key", "client_secret", "session_cookie"]
+
+# Bug bounty platform credentials — these grant access to private program data.
+[[rules]]
+id = "h1-api-token"
+description = "HackerOne API token assignment"
+regex = '''(?i)(h1|hackerone)[_-]?(api)?[_-]?(token|key)\s*[:=]\s*["']?[A-Za-z0-9/+=_\-]{20,}'''
+keywords = ["hackerone", "h1_token", "h1_api"]
+
+[[rules]]
+id = "bugcrowd-token"
+description = "Bugcrowd token assignment"
+regex = '''(?i)bugcrowd[_-]?(api)?[_-]?(token|key)\s*[:=]\s*["']?[A-Za-z0-9/+=_\-]{20,}'''
+keywords = ["bugcrowd"]
+
+[[rules]]
+id = "recon-service-key"
+description = "Recon service API key (Shodan/Censys/Chaos/SecurityTrails/VirusTotal)"
+regex = '''(?i)(shodan|censys|chaos|securitytrails|virustotal|binaryedge|fofa|zoomeye)[_-]?(api)?[_-]?key\s*[:=]\s*["']?[A-Za-z0-9]{16,}'''
+keywords = ["shodan", "censys", "chaos", "securitytrails", "virustotal", "binaryedge", "fofa", "zoomeye"]
+
+[allowlist]
+description = "Documentation placeholders and example values only"
+# Never allowlist a real path that could hold a live key.
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''(^|/)\.env\.example$''',
+  '''(^|/)SECURITY\.md$''',
+]
+regexes = [
+  '''sk-ant-YOUR-KEY-HERE''',
+  '''sk-ant-api03-xxx''',
+  '''<your-key>''',
+  '''\$\{\{\s*secrets\.''',   # GitHub Actions secret references are not secrets
+  '''\$\{?ANTHROPIC_API_KEY\}?''',
+]

@@ -1,0 +1,57 @@
+# BBHUNT scoring model — the single source of truth for both score models.
+# tools/bbscore.py reads this file; skill/modules/scoring.md explains the anchors.
+# Weights within each model must sum to 100.
+
+program_opportunity_score:
+  reward_potential:      25   # published reward table strength (REWARD_UNKNOWN scores low)
+  acceptance_evidence:   20   # resolved + bountied public reports, response stats
+  scope_quality:         15   # breadth, explicitness, asset-type variety
+  attack_surface:        15   # auth, payments, multi-tenancy, API, cloud, admin
+  program_activity:      10   # recent resolutions, recent scope updates
+  duplicate_resistance:  10   # inverse of hunting saturation
+  research_feasibility:   5   # account access, public source, lab difficulty
+
+opportunity_score:
+  technical_impact:      30
+  payout_potential:      20   # capped at 8 when rewards are REWARD_UNKNOWN
+  acceptance_evidence:   15
+  exploitability:        15
+  scope_quality:         10   # 0 when scope is unverified — and the candidate stops
+  freshness:              5
+  duplicate_resistance:   5
+
+thresholds:
+  strong_evidence: 80         # ranking tier only — NOT a probability of payout
+  research_worthy: 65         # below this, do not spend deep analysis tokens
+  report_worthy:   70         # below this, keep as RESEARCH CANDIDATE
+  top_list_size:   10
+
+confidence_bands:             # applies to payout_confidence and acceptance_confidence
+  VERY_HIGH: 85
+  HIGH:      70
+  MEDIUM:    50
+  LOW:       25
+  # below LOW, or fewer than min_evidence_items, => INSUFFICIENT DATA
+  min_evidence_items: 3
+
+duplicate_risk_points:        # feeds duplicate_resistance in opportunity_score
+  LOW_DUPLICATE_RISK: 5
+  UNKNOWN:            3
+  POSSIBLE_DUPLICATE: 2
+  LIKELY_DUPLICATE:   1
+  KNOWN:              0
+
+payout_potential_caps:
+  reward_unknown_max: 8       # never score payout potential above this without published figures
+
+freshness_days:               # full marks decay to zero across this window
+  full_marks_within: 7
+  zero_after:        90
+
+tie_breakers:                 # applied in order on equal scores
+  - lower_duplicate_risk
+  - lower_privilege_requirement
+  - published_reward_over_unknown
+  - local_repro_feasible
+  - fresher_disclosure
+# CVSS is deliberately absent as a tie-breaker and as a scoring input.

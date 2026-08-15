@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# BBHUNT pre-commit — blocks secrets and premature disclosure.
+# Enable with: git config core.hooksPath .githooks   (or run tools/harden.sh)
+#
+# Bypass is possible with --no-verify. Do not: this repo is public, and the
+# server-side push protection that would catch it is a last line, not a first.
+
+set -uo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+exec "${REPO_ROOT}/tools/secret-scan.sh" staged

@@ -1,0 +1,102 @@
+name: bbhunt weekly summary
+
+# Aggregates the week's daily intelligence into reports/weekly/YYYY-WXX.md.
+# Trends come from skill/state/history.json only — a trend needs at least 3
+# data points, otherwise the report says INSUFFICIENT DATA. Never invent
+# payout statistics.
+#
+# Same security posture as daily-intel.yml: schedule/manual triggers only,
+# SHA-pinned actions, read-only by default, no persisted git credentials while
+# the model step runs.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"      # Mondays 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bbhunt-weekly
+  cancel-in-progress: false
+
+jobs:
+  summary:
+    if: github.repository == 'ShuPriX/BBHUNT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      HAS_MODEL_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+      BBHUNT_MODEL: claude-opus-5
+      BBHUNT_EFFORT: xhigh
+
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install --quiet pyyaml
+
+      - name: Aggregate state
+        run: |
+          python3 tools/bbstate.py init
+          python3 tools/bbstate.py stats
+          python3 tools/bbstate.py stale --days 7
+
+      - name: Collect this week's dailies
+        run: ls -1 reports/daily/ 2>/dev/null | tail -7 || echo "no daily reports yet"
+
+      - name: Scaffold weekly report
+        run: python3 tools/bbreport.py weekly --force
+
+      - name: Analysis pass — Opus 5, xhigh effort
+        if: env.HAS_MODEL_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -eu
+          echo "::add-mask::${ANTHROPIC_API_KEY}"
+          npm install -g @anthropic-ai/claude-code
+          claude -p "BBHUNT weekly — aggregate this week's dailies into the scaffolded weekly report" \
+                 --model "${BBHUNT_MODEL}" \
+                 --effort "${BBHUNT_EFFORT}" \
+                 --permission-mode acceptEdits \
+                 --allowedTools "Read,Write,Edit,Bash"
+
+      - name: Skip analysis notice
+        if: env.HAS_MODEL_KEY != 'true'
+        run: echo "::notice::ANTHROPIC_API_KEY not set — scaffold only."
+
+      - name: Secret scan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh \
+            | sh -s -- -b /usr/local/bin || echo "::warning::gitleaks install failed, using regex fallback"
+          ./tools/secret-scan.sh tree
+
+      - name: Stage, verify, commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "bbhunt-bot"
+          git config user.email "bbhunt-bot@users.noreply.github.com"
+          git config bbhunt.visibility public
+
+          git add reports/ intelligence/ skill/state/
+          if git diff --cached --quiet; then
+            echo "no changes"; exit 0
+          fi
+
+          ./tools/secret-scan.sh staged
+
+          git commit -m "bbhunt: weekly summary $(date -u +%G-W%V)"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}

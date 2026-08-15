@@ -1,0 +1,51 @@
+# BBHUNT Weekly — {{WEEK}}
+
+{{RANGE}} · {{RUNS}} runs
+
+## Highest-value programs this week
+
+| # | Program | Score Δ | Max reward | Notes |
+|---|---|---|---|---|
+
+## New programs
+
+## Scope changes
+
+Detected by `scope_hash` delta in `skill/state/programs.json`.
+
+| Program | Change | Impact on hunting |
+|---|---|---|
+
+## Notable new vulnerabilities
+
+## High-value vulnerability classes this week
+
+## Top attack surfaces
+
+## Duplicate trends
+
+## Reward trends
+
+> Trends require at least 3 data points from `skill/state/history.json`.
+> Otherwise: INSUFFICIENT DATA. Never invent payout statistics.
+
+## Research results
+
+| Candidate | Program | Outcome | Confidence |
+|---|---|---|---|
+
+## False-positive trends
+
+What was rejected and why — the patterns here are what makes next week cheaper.
+
+## Quality metrics
+
+```
+Quality gate pass rate:
+Local reproduction rate:
+Candidates advanced / evaluated:
+Reject rate:
+Artifacts generated:
+```
+
+## Focus for next week

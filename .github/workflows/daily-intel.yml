@@ -1,0 +1,160 @@
+name: bbhunt daily intel
+
+# Runs the deterministic half of the pipeline every day: state check, source
+# reachability, scope-delta detection against the public bulk dump, and a
+# scaffolded daily report.
+#
+# The analysis half (program ranking, vulnerability correlation, patch
+# analysis, artifact authoring) runs Claude Opus 5 at xhigh effort, and only
+# when ANTHROPIC_API_KEY is configured as a repository secret. Without it the
+# workflow still produces the deltas a local BBHUNT run consumes.
+#
+# SECURITY NOTES — this repository is public.
+#   * Triggers are schedule + manual only. There is deliberately no
+#     pull_request / pull_request_target / issue_comment trigger: those run
+#     attacker-influenced content and are the standard way Actions secrets leak.
+#   * Actions are pinned to immutable commit SHAs, not moving tags.
+#   * Top-level permissions are read-only; only the commit job may write.
+#   * checkout uses persist-credentials: false, so no git credential sits in
+#     the workspace while the model step runs with shell access.
+#   * The API key is scoped to the single step that needs it and is never
+#     printed. Never add `set -x` to that step.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"      # 06:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bbhunt-daily
+  cancel-in-progress: false
+
+jobs:
+  intel:
+    # Never run in a fork: a fork gets no secrets, and the push would fail anyway.
+    if: github.repository == 'ShuPriX/BBHUNT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write        # required to commit the day's intelligence
+    env:
+      # `secrets` is not available in a step-level `if`, so surface a boolean here.
+      HAS_MODEL_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+      BBHUNT_MODEL: claude-opus-5
+      BBHUNT_EFFORT: xhigh
+
+    steps:
+      - name: Checkout (no persisted credentials)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install --quiet pyyaml
+
+      - name: Load state
+        run: |
+          python3 tools/bbstate.py init
+          python3 tools/bbstate.py status
+
+      - name: Refresh sources (reachability + scope deltas)
+        run: |
+          set -uo pipefail
+          mkdir -p /tmp/bbhunt-src intelligence/platforms
+
+          for f in hackerone bugcrowd intigriti yeswehack hackenproof; do
+            url="https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/${f}_data.json"
+            if curl -sSfL --max-time 90 "$url" -o "/tmp/bbhunt-src/${f}.json"; then
+              echo "ok      ${f} ($(wc -c < "/tmp/bbhunt-src/${f}.json") bytes)"
+            else
+              echo "FAILED  ${f}"
+              python3 tools/bbstate.py fail-source "$f" --error "bulk dump fetch failed"
+            fi
+          done
+
+          # Digest per platform so scope drift is detectable on the next run.
+          for f in /tmp/bbhunt-src/*.json; do
+            [ -e "$f" ] || continue
+            name="$(basename "$f" .json)"
+            printf '{"platform":"%s","sha256":"%s","bytes":%s,"fetched_at":"%s"}\n' \
+              "$name" "$(sha256sum "$f" | cut -d' ' -f1)" "$(wc -c < "$f")" \
+              "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "intelligence/platforms/${name}.json"
+          done
+
+      - name: Source availability check
+        run: |
+          set -uo pipefail
+          while read -r name url; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$url" || echo 000)"
+            echo "${code}  ${name}"
+            case "$code" in
+              2*|3*|4*) ;;   # 4xx usually means "needs a key", not "down"
+              *) python3 tools/bbstate.py fail-source "$name" --error "HTTP $code" ;;
+            esac
+          done <<'SOURCES'
+          nvd https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1
+          kev https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+          osv https://api.osv.dev/v1/query
+          ghsa https://github.com/advisories
+          patchstack https://patchstack.com/database/
+          wordfence https://www.wordfence.com/threat-intel/vulnerabilities/
+          SOURCES
+
+      - name: Scaffold daily report
+        run: python3 tools/bbreport.py daily --force
+
+      - name: Analysis pass — Opus 5, xhigh effort
+        if: env.HAS_MODEL_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # No `set -x` here — it would echo the environment.
+          set -eu
+          echo "::add-mask::${ANTHROPIC_API_KEY}"
+          npm install -g @anthropic-ai/claude-code
+          claude -p "BBHUNT" \
+                 --model "${BBHUNT_MODEL}" \
+                 --effort "${BBHUNT_EFFORT}" \
+                 --permission-mode acceptEdits \
+                 --allowedTools "Read,Write,Edit,Bash,WebFetch,WebSearch"
+
+      - name: Skip analysis notice
+        if: env.HAS_MODEL_KEY != 'true'
+        run: |
+          echo "::notice::ANTHROPIC_API_KEY not set — deterministic intel only."
+          echo "Set it with: gh secret set ANTHROPIC_API_KEY --repo ShuPriX/BBHUNT"
+
+      - name: Secret scan (same rules as the local hooks)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh \
+            | sh -s -- -b /usr/local/bin || echo "::warning::gitleaks install failed, using regex fallback"
+          ./tools/secret-scan.sh tree
+
+      - name: Stage, verify, commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "bbhunt-bot"
+          git config user.email "bbhunt-bot@users.noreply.github.com"
+          git config bbhunt.visibility public
+
+          git add intelligence/ opportunities/ research/ reports/ skill/state/
+
+          if git diff --cached --quiet; then
+            echo "no changes"; exit 0
+          fi
+
+          # Same gate the pre-commit hook enforces locally.
+          ./tools/secret-scan.sh staged
+
+          git commit -m "bbhunt: daily intel $(date -u +%Y-%m-%d)"
+          # Credentials are injected here only, never persisted to .git/config.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}

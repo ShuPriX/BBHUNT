@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# BBHUNT pre-push — last local check before anything leaves the machine.
+# Scans the whole working tree, not just the staged diff, because a secret can
+# arrive in an earlier commit on the branch.
+
+set -uo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+exec "${REPO_ROOT}/tools/secret-scan.sh" tree

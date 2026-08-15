@@ -1,0 +1,89 @@
+# BBHUNT exclusions — checked in S7, BEFORE research spend.
+#
+# "always_rejected" issues are informational at nearly every program. Do not
+# research them, do not report them alone. "conditional" issues are only
+# submittable with the stated demonstrated chain.
+
+always_rejected:
+  reporting_hygiene:
+    - missing security headers (CSP, HSTS, X-Frame-Options) with no demonstrated exploit
+    - cookie flags (missing Secure/HttpOnly/SameSite) with no demonstrated impact
+    - missing SPF/DKIM/DMARC without a working spoof to a real inbox
+    - clickjacking on a page with no state-changing action
+    - version banner / software fingerprint disclosure
+    - directory listing of non-sensitive content
+    - verbose error page without sensitive data
+    - autocomplete enabled on a form field
+    - weak TLS ciphers / TLS config without a working attack
+    - descriptive HTTP OPTIONS / TRACE with no impact
+  user_self_harm:
+    - self-XSS
+    - issues requiring a fully compromised or rooted victim device
+    - issues requiring physical access to an unlocked device
+    - social engineering of staff or users
+    - attacks requiring a MITM position you cannot obtain
+  low_value_auth:
+    - missing rate limiting with no brute-forceable secret behind it
+    - no account lockout / password policy complaints
+    - session not expiring on a schedule you prefer
+    - email enumeration on signup/login (unless the program explicitly pays it)
+    - logout CSRF, login CSRF without account-linking impact
+    - password reset token in the URL without a working leak path
+  infrastructure_noise:
+    - open ports without a demonstrated vulnerable service
+    - denial of service, resource exhaustion, load-based findings — never test these
+    - reflected file download, tabnabbing without a stolen credential
+    - host header injection with no cache poisoning or reset-link impact
+    - scanner-reported vulnerable library with no reachable call path
+    - subdomain takeover claimed from a CNAME alone with no proven claimability
+  mobile:
+    - lack of obfuscation, root/jailbreak detection, or certificate pinning as standalone issues
+    - tapjacking, backup of non-sensitive data
+    - hardcoded keys that are public-by-design (restricted client keys)
+  ai:
+    - jailbreaks, refusal bypass, harmful-content generation
+    - hallucination, factual errors, bias
+    - prompt-only findings with no boundary crossing
+    - token-burn / cost-abuse without a security impact
+
+conditional_valid_with_chain:
+  open_redirect:        requires OAuth/SSO token theft or a demonstrated account impact
+  csrf:                 requires a state-changing, non-trivial action (email/password/payment)
+  cors_misconfig:       requires credentialed cross-origin read of sensitive data
+  ssrf_blind:           requires an internal service hit, metadata access, or a proven pivot
+  info_disclosure:      requires the leaked data to be sensitive and non-public
+  rate_limit:           requires brute force of OTP, token, coupon, or credential
+  xss_reflected:        requires it firing in another user's session (not self-XSS)
+  idor_read:            requires the object to belong to another user/tenant and be sensitive
+  path_traversal:       requires reading a file outside the intended directory
+  dependency_cve:       requires a reachable code path on their asset, or their policy accepts it
+  subdomain_takeover:   requires proof the resource is actually claimable (do not claim it)
+
+scope_hard_stops:
+  - asset not explicitly listed in scope
+  - asset listed in out-of-scope
+  - asset not owned/operated by the program organization
+  - third-party SaaS the program does not control (report to the vendor instead)
+  - program status paused, retired, or unverifiable
+  - policy prohibits the technique required to demonstrate the finding
+
+prohibited_techniques:
+  - denial of service, stress testing, resource exhaustion
+  - destructive testing (delete, overwrite, encrypt, corrupt)
+  - accessing, modifying, or exfiltrating other users' data
+  - credential brute force against real accounts
+  - persistence, backdoors, implants, C2
+  - malware deployment
+  - detection/defense evasion against production security controls
+  - lateral movement or pivoting beyond the proof
+  - mass or automated exploitation across hosts
+  - social engineering, phishing, physical intrusion
+  - testing outside the stated window or above the stated rate limit
+
+deprioritize_when:
+  - public exploit already exists (high duplicate risk)
+  - vulnerability disclosed more than 90 days ago with heavy write-up coverage
+  - product install base is negligible
+  - requires an admin/superuser precondition (usually not a privilege boundary)
+  - requires a non-default configuration almost nobody enables
+  - CVSS is high but real-world reachability is not demonstrable

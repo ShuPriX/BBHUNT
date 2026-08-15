@@ -1,0 +1,60 @@
+# Detection template — write one ONLY when detection is possible without
+# exploitation. If detecting the flaw requires triggering it, delete this file
+# and write "detection template omitted: cannot detect without exploiting"
+# in README.md instead.
+#
+# Rules: fingerprint/version matchers preferred, single request where possible,
+# no state change, no destructive method, deterministic matchers (never
+# status==200 alone), severity matching reality.
+
+id: <cve-or-slug>
+
+info:
+  name: <Product> <version range> - <vulnerability class>
+  author: bbhunt
+  severity: <critical|high|medium|low>
+  description: |
+    <one or two lines: what is detected and what it indicates>
+  impact: |
+    <what an attacker gains if the detection is a true positive>
+  remediation: Upgrade to <fixed version>.
+  reference:
+    - <vendor advisory url>
+    - <fix commit url>
+  classification:
+    cve-id: <CVE-YYYY-NNNNN>
+    cwe-id: CWE-<n>
+    cvss-metrics: <vector>
+    cvss-score: <score>
+  metadata:
+    verified: <true|false>
+    max-request: 1
+  tags: <cve-year>,<cve>,<product>,<class>
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/<safe-fingerprint-path>"
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "<unique version or component marker>"
+
+      - type: dsl
+        dsl:
+          - "compare_versions(version, '< <fixed-version>')"
+
+      - type: status
+        status:
+          - 200
+
+    extractors:
+      - type: regex
+        part: body
+        group: 1
+        name: version
+        regex:
+          - "<version-capture-regex>"

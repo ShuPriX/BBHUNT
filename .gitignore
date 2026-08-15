@@ -1,1 +1,52 @@
-hunts
+# ── credentials — this repo is PUBLIC, never commit any of these ────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+cookies.txt
+**/credentials.json
+**/service-account*.json
+config/secrets.yaml
+config/*.local.yaml
+.shodan/
+.netrc
+.claude/settings.local.json
+
+# ── recon/scan output — never commit hunt data ──────────────────────
+hunts/
+loot/
+*.pcap
+*.har
+
+# ── undisclosed research — see SECURITY.md §3 ───────────────────────
+# Keep pre-disclosure findings here; the pre-commit guard also blocks any
+# research/ artifact without "public_disclosure_ok": true in metadata.json.
+research/**/private/
+research/**/*.local.md
+
+# ── local lab scratch ───────────────────────────────────────────────
+/tmp-lab/
+*.apk
+*.ipa
+*.zip
+*.tar.gz
+*.war
+*.jar
+
+# ── python ──────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── editor / OS ─────────────────────────────────────────────────────
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
