@@ -1,5 +1,11 @@
 {
-  "failed_sources": [],
+  "failed_sources": [
+    {
+      "at": "2026-08-16T06:25:08Z",
+      "error": "bulk dump fetch failed",
+      "source": "hackenproof"
+    }
+  ],
   "last_run": null,
   "notes": "",
   "pending_research": [],
