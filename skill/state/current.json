@@ -1,9 +1,14 @@
 {
   "failed_sources": [
     {
-      "at": "2026-11-12T14:19:46Z",
+      "at": "2026-11-13T13:40:38Z",
       "error": "bulk dump fetch failed",
       "source": "hackenproof"
+    },
+    {
+      "at": "2026-11-13T13:41:03Z",
+      "error": "HTTP 000000",
+      "source": "nvd"
     }
   ],
   "last_run": null,
