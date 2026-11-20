@@ -1,14 +1,14 @@
 {
   "failed_sources": [
     {
-      "at": "2026-11-19T14:57:08Z",
-      "error": "bulk dump fetch failed",
-      "source": "hackenproof"
-    },
-    {
       "at": "2026-11-19T14:57:09Z",
       "error": "HTTP 503",
       "source": "nvd"
+    },
+    {
+      "at": "2026-11-20T14:38:59Z",
+      "error": "bulk dump fetch failed",
+      "source": "hackenproof"
     }
   ],
   "last_run": null,
